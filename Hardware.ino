@@ -4,21 +4,11 @@
 #include <DFRobot_BMI160.h>
 #include <DFRobot_GNSS.h>
 
-// ======================
-// WiFi Credentials
-// ======================
 const char* ssid = "SSID";
 const char* password = "password";
 
-// ======================
-// Google Script URL
-// (GANTI SESUAI URL WEB APP KAMU)
-// ======================
 String scriptURL = "urlapps.script";
 
-// ======================
-// Sensor Setup
-// ======================
 #define SDA_PIN 21
 #define SCL_PIN 22
 #define BMI160_ADDR 0x69
@@ -99,7 +89,6 @@ void loop() {
                         String(lat, 6) + "," + 
                         String(lon, 6);
 
-      // JSON Format sesuai dengan Apps Script di video
       String json = "{";
       json += "\"timestamp\":\"" + String(now) + "\",";
       json += "\"accel_x\":\"" + String(accel[0]) + "\",";
