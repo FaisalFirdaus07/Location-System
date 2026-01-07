@@ -76,7 +76,7 @@ void loop() {
     Serial.printf("GPS: lat=%.6f lon=%.6f\n", lat, lon);
   }
 
-  if (now - prevSendMillis >= SEND_INTERVAL) {
+if (now - prevSendMillis >= SEND_INTERVAL) {
     prevSendMillis = now;
 
     if (WiFi.status() == WL_CONNECTED) {
@@ -85,9 +85,10 @@ void loop() {
       http.begin(scriptURL);
       http.addHeader("Content-Type", "application/json");
 
-      String mapsLink = "https://www.google.com/maps?q=" + 
-                        String(lat, 6) + "," + 
-                        String(lon, 6);
+      String strLat = "-" + String(abs(lat), 6); 
+      String strLon = String(lon, 6);
+
+      String mapsLink = "https://www.google.com/maps?q=" + strLat + "," + strLon;
 
       String json = "{";
       json += "\"timestamp\":\"" + String(now) + "\",";
@@ -97,13 +98,16 @@ void loop() {
       json += "\"gyro_x\":\"" + String(gyro[0]) + "\",";
       json += "\"gyro_y\":\"" + String(gyro[1]) + "\",";
       json += "\"gyro_z\":\"" + String(gyro[2]) + "\",";
-      json += "\"lat\":\"" + String(lat, 6) + "\",";
-      json += "\"lon\":\"" + String(lon, 6) + "\",";
+      
+      json += "\"lat\":\"" + strLat + "\",";
+      json += "\"lon\":\"" + strLon + "\",";
+      
       json += "\"maps\":\"" + mapsLink + "\"";
       json += "}";
 
       int httpCode = http.POST(json);
       Serial.printf("Upload Result: %d\n", httpCode);
+      Serial.println("Link: " + mapsLink);
 
       if (httpCode > 0) Serial.println("Data terkirim ke Google Sheet.");
       else Serial.println("Gagal mengirim.");
