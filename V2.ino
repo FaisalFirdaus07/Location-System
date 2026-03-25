@@ -78,7 +78,7 @@ void TaskUpload(void *pvParameters) {
       json += "\"accel_x\":" + String(tx_accel[0]) + ",";
       json += "\"accel_y\":" + String(tx_accel[1]) + ",";
       json += "\"accel_z\":" + String(tx_accel[2]) + ",";
-      json += "\"gyro_x\":" + String(tx_accel[0]) + ","; // Typo fix: gyro index
+      json += "\"gyro_x\":" + String(tx_gyro[0]) + ","; // Typo fix: gyro index
       json += "\"gyro_y\":" + String(tx_gyro[1]) + ",";
       json += "\"gyro_z\":" + String(tx_gyro[2]) + ",";
       json += "\"lat\":" + String(tx_lat, 8) + ",";
