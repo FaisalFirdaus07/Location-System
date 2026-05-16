@@ -7,9 +7,9 @@
 #include <freertos/task.h>
 
 // --- KONFIGURASI JARINGAN ---
-const char* ssid     = "Damien";      
-const char* password = "faisal12";  
-String scriptURL     = "https://script.google.com/macros/s/AKfycbyeFHKFeXWIVql8C1PP1v6IWWmy4atXQiEINauYudhzFmyd1vgkOyv27bJlcAys-JD-bw/exec"; 
+const char* ssid     = "ssid";      
+const char* password = "pass";  
+String scriptURL     = "appscripturl"; 
 
 // --- PIN I2C (Sesuai dengan example yang berhasil) ---
 #define I2C_SDA 5
