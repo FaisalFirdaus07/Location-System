@@ -1,6 +1,3 @@
-cat > /home/claude/bilstm_ekf_neonatus_incubator.py << 'PYEOF'
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 ================================================================================
 JUDUL : Prediksi Lintasan Inkubator Jinjing Neonatus Saat Kehilangan Sinyal
