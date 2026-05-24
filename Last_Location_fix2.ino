@@ -206,6 +206,7 @@ void TaskUpload(void *pvParameters) {
       jsonBatch += "\"ax\":" + String(pkt.accel.x) + ",\"ay\":" + String(pkt.accel.y) + ",\"az\":" + String(pkt.accel.z) + ",";
       jsonBatch += "\"gx\":" + String(pkt.gyro.x) + ",\"gy\":" + String(pkt.gyro.y) + ",\"gz\":" + String(pkt.gyro.z) + ",";
       jsonBatch += "\"mx\":" + String(pkt.mag.x) + ",\"my\":" + String(pkt.mag.y) + ",\"mz\":" + String(pkt.mag.z) + ",";
+      jsonBatch += "\"head\":" + String(pkt.euler.head) + ",\"pitch\":" + String(pkt.euler.pitch) + ",\"roll\":" + String(pkt.euler.roll) + ",";
       jsonBatch += "\"lat\":" + String(pkt.lat, 8) + ",\"lon\":" + String(pkt.lon, 8) + ",";
       jsonBatch += "\"alt\":" + String(pkt.alt, 2) + ",\"sat\":" + String(pkt.sat);
       jsonBatch += "}";
