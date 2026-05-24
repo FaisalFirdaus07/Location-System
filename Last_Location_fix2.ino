@@ -9,9 +9,9 @@
 #include <sys/time.h>
 
 // --- KONFIGURASI JARINGAN ---
-const char* ssid     = "ssid";      
-const char* password = "pass";  
-String scriptURL     = "appscripturl"; 
+const char* ssid     = "ssid";
+const char* password = "pass";
+String scriptURL     = "urlappscript";
 
 // --- KONFIGURASI NTP ---
 #define NTP_SERVER      "pool.ntp.org"
@@ -172,48 +172,66 @@ bool ensureWiFiConnected() {
 }
 
 // --- CORE 0: TASK UPLOAD ---
-// Menerima data dari queue dan mengirimnya via HTTP.
-// Durasi HTTP tidak mempengaruhi interval pengiriman karena
-// jadwal pengumpulan data ada di loop() (Core 1), bukan di sini.
+// --- CORE 0: TASK UPLOAD (BATCH UPLOAD) ---
 void TaskUpload(void *pvParameters) {
   UploadPacket pkt;
-
+  
+  // Mengirim maksimal 5 data sekaligus per request untuk menghemat waktu
+  const int BATCH_SIZE = 5; 
+  
   while (true) {
-    // Tunggu data baru dari queue (blocking, max 2 detik)
-    if (xQueueReceive(uploadQueue, &pkt, pdMS_TO_TICKS(2000)) != pdTRUE) {
-      continue; // Tidak ada data, tunggu lagi
+    // Mengecek apakah queue kosong
+    if (uxQueueMessagesWaiting(uploadQueue) == 0) {
+      vTaskDelay(pdMS_TO_TICKS(100)); // Istirahat sejenak
+      continue; 
     }
 
     if (!ensureWiFiConnected()) {
       Serial.println("[Upload] ⏭️ Skip upload, WiFi tidak tersedia.");
+      vTaskDelay(pdMS_TO_TICKS(1000));
       continue;
     }
 
-    HTTPClient http;
-    http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS); // Lebih cepat dari STRICT
-    http.setConnectTimeout(HTTP_CONNECT_TIMEOUT_MS);        // Timeout koneksi TCP
-    http.setTimeout(HTTP_RESPONSE_TIMEOUT_MS);              // Timeout tunggu respons
-    http.begin(scriptURL);
-    http.addHeader("Content-Type", "application/json");
+    // Membuka JSON Array "["
+    String jsonBatch = "[";
+    int count = 0;
 
-    String json = "{";
-    json += "\"datetime\":\"" + String(pkt.datetime) + "\",";
-    json += "\"timestamp\":" + String((uint64_t)pkt.timestamp_ms) + ",";
-    json += "\"ax\":" + String(pkt.accel.x) + ",\"ay\":" + String(pkt.accel.y) + ",\"az\":" + String(pkt.accel.z) + ",";
-    json += "\"gx\":" + String(pkt.gyro.x) + ",\"gy\":" + String(pkt.gyro.y) + ",\"gz\":" + String(pkt.gyro.z) + ",";
-    json += "\"mx\":" + String(pkt.mag.x) + ",\"my\":" + String(pkt.mag.y) + ",\"mz\":" + String(pkt.mag.z) + ",";
-    json += "\"head\":" + String(pkt.euler.head) + ",\"pitch\":" + String(pkt.euler.pitch) + ",\"roll\":" + String(pkt.euler.roll) + ",";
-    json += "\"lat\":" + String(pkt.lat, 8) + ",\"lon\":" + String(pkt.lon, 8) + ",";
-    json += "\"alt\":" + String(pkt.alt, 2) + ",\"sat\":" + String(pkt.sat);
-    json += "}";
-
-    int httpCode = http.POST(json);
-    if (httpCode > 0) {
-      Serial.printf("[Upload] ✅ Terkirim! [%s] HTTP:%d\n", pkt.datetime, httpCode);
-    } else {
-      Serial.printf("[Upload] ❌ HTTP Error: %s\n", http.errorToString(httpCode).c_str());
+    // Menarik hingga BATCH_SIZE data dari Queue
+    while (count < BATCH_SIZE && xQueueReceive(uploadQueue, &pkt, 0) == pdTRUE) {
+      if (count > 0) jsonBatch += ","; // Koma pemisah antar objek JSON
+      
+      jsonBatch += "{";
+      jsonBatch += "\"datetime\":\"" + String(pkt.datetime) + "\",";
+      jsonBatch += "\"timestamp\":" + String((uint64_t)pkt.timestamp_ms) + ",";
+      jsonBatch += "\"ax\":" + String(pkt.accel.x) + ",\"ay\":" + String(pkt.accel.y) + ",\"az\":" + String(pkt.accel.z) + ",";
+      jsonBatch += "\"gx\":" + String(pkt.gyro.x) + ",\"gy\":" + String(pkt.gyro.y) + ",\"gz\":" + String(pkt.gyro.z) + ",";
+      jsonBatch += "\"mx\":" + String(pkt.mag.x) + ",\"my\":" + String(pkt.mag.y) + ",\"mz\":" + String(pkt.mag.z) + ",";
+      jsonBatch += "\"lat\":" + String(pkt.lat, 8) + ",\"lon\":" + String(pkt.lon, 8) + ",";
+      jsonBatch += "\"alt\":" + String(pkt.alt, 2) + ",\"sat\":" + String(pkt.sat);
+      jsonBatch += "}";
+      
+      count++;
     }
-    http.end();
+    
+    jsonBatch += "]"; // Menutup JSON Array
+
+    // Jika ada data yang berhasil ditarik, kirimkan
+    if (count > 0) {
+      HTTPClient http;
+      http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+      http.setConnectTimeout(HTTP_CONNECT_TIMEOUT_MS);
+      http.setTimeout(HTTP_RESPONSE_TIMEOUT_MS);
+      http.begin(scriptURL);
+      http.addHeader("Content-Type", "application/json");
+
+      int httpCode = http.POST(jsonBatch);
+      if (httpCode > 0) {
+        Serial.printf("[Upload] ✅ Batch (%d data) Terkirim! HTTP:%d\n", count, httpCode);
+      } else {
+        Serial.printf("[Upload] ❌ HTTP Error: %s\n", http.errorToString(httpCode).c_str());
+      }
+      http.end();
+    }
   }
 }
 
@@ -225,7 +243,7 @@ void setup() {
   dataMutex = xSemaphoreCreateMutex();
 
   // Inisialisasi queue (buffer 5 paket jika HTTP sempat lambat)
-  uploadQueue = xQueueCreate(5, sizeof(UploadPacket));
+  uploadQueue = xQueueCreate(60, sizeof(UploadPacket));
 
   // Inisialisasi shared_datetime agar tidak kosong sebelum NTP sync
   strncpy(shared_datetime, "1970-01-01 00:00:00.000", sizeof(shared_datetime));
@@ -271,20 +289,36 @@ void loop() {
 
     sLonLat_t latVal = gnss.getLat();
     sLonLat_t lonVal = gnss.getLon();
+    
+    uint8_t current_sat = gnss.getNumSatUsed();
     double raw_lat = latVal.latitudeDegree;
     double raw_lon = lonVal.lonitudeDegree;
-    if (raw_lat > 0 && raw_lat < 10) raw_lat = -raw_lat;
+
+    // --- FILTER GPS 3T ---
+    // Jika satelit kurang dari 3, anggap data GNSS korup/blackout
+    if (current_sat < 3 || raw_lat == 0.0 || raw_lon == 0.0 || raw_lon == 107.0) {
+        raw_lat = 0.0; // Flag untuk AI bahwa GPS putus
+        raw_lon = 0.0;
+    } else {
+        if (raw_lat > 0 && raw_lat < 10) raw_lat = -raw_lat; // Koreksi hemisphere
+    }
 
     // Buat paket data untuk dikirim ke queue
     UploadPacket pkt;
-    pkt.accel = raw_accel;
+    
+    // --- KONVERSI IMU (Milli-g ke m/s^2) ---
+    // Konstanta 0.00980665 digunakan untuk menyamakan unit ESP32 dengan Ground Truth
+    pkt.accel.x = raw_accel.x * 0.00980665;
+    pkt.accel.y = raw_accel.y * 0.00980665;
+    pkt.accel.z = raw_accel.z * 0.00980665;
+    
     pkt.gyro  = raw_gyro;
     pkt.mag   = raw_mag;
     pkt.euler = raw_euler;
     pkt.lat   = raw_lat;
     pkt.lon   = raw_lon;
     pkt.alt   = gnss.getAlt();
-    pkt.sat   = gnss.getNumSatUsed();
+    pkt.sat   = current_sat;
     pkt.timestamp_ms = getUnixTimestampMs();
     getDatetimeString(pkt.datetime, sizeof(pkt.datetime));
 
