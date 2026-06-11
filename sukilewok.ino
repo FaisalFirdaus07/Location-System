@@ -21,8 +21,8 @@
 // ============================================================
 //  KONFIGURASI — SESUAIKAN BAGIAN INI
 // ============================================================
-const char* ssid     = "Damien";
-const char* password = "faisal12";
+const char* ssid     = "ssd";
+const char* password = "pass";
 
 #define API_KEY      "API_Key"
 #define DATABASE_URL "URL"
